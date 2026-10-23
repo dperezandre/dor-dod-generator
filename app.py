@@ -1,13 +1,14 @@
 import itertools
 import os
-import re
 from datetime import datetime
 
 import streamlit as st
 from google import genai
 from google.genai import types
 
-MODEL = "gemini-2.5-flash"
+# gemini-2.5-flash foi descontinuado para contas novas. O flash-lite responde em segundos;
+# os flash maiores chegaram a levar mais de 2 min ou retornar 503. Sobrescreva via GEMINI_MODEL.
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 
 SYSTEM_PROMPT = """
 Você é um consultor especialista para Tech Leads e Product Owners atuando em arquiteturas modernas (Front-end, BFF, APIs .NET/Node, SQL Server/Oracle, Microsserviços e Azure DevOps).
@@ -62,18 +63,16 @@ def build_user_prompt(relato: str, tipo: str, stacks: list[str]) -> str:
     return "\n\n".join(partes)
 
 
-def extract_copy_block(markdown: str) -> str | None:
-    """Retorna o conteúdo do último bloco de código da resposta (seção 4)."""
-    blocos = re.findall(r"```[^\n]*\n(.*?)```", markdown, flags=re.DOTALL)
-    return blocos[-1].strip() if blocos else None
-
-
 def generate_stream(api_key: str, relato: str, tipo: str, stacks: list[str]):
     client = genai.Client(api_key=api_key)
     stream = client.models.generate_content_stream(
         model=MODEL,
         contents=build_user_prompt(relato, tipo, stacks),
-        config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT),
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            # Sem "thinking": a estrutura é fixa e o raciocínio atrasava o primeiro trecho em dezenas de segundos.
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        ),
     )
     for chunk in stream:
         if chunk.text:
@@ -86,10 +85,7 @@ def render_result(markdown: str, key: str) -> None:
 
 
 def render_extras(markdown: str, key: str) -> None:
-    bloco = extract_copy_block(markdown)
-    if bloco:
-        st.caption("📋 Use o ícone de copiar no canto do bloco abaixo para colar no Azure DevOps:")
-        st.code(bloco, language="markdown")
+    st.caption("📋 Para colar no Azure DevOps, use o ícone de copiar no canto do bloco de código da seção 4.")
     st.download_button(
         "⬇️ Baixar resultado (.md)",
         data=markdown,
