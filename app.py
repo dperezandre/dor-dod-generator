@@ -1,3 +1,4 @@
+import itertools
 import os
 import re
 from datetime import datetime
@@ -67,20 +68,24 @@ def extract_copy_block(markdown: str) -> str | None:
     return blocos[-1].strip() if blocos else None
 
 
-def generate(api_key: str, relato: str, tipo: str, stacks: list[str]) -> str:
+def generate_stream(api_key: str, relato: str, tipo: str, stacks: list[str]):
     client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
+    stream = client.models.generate_content_stream(
         model=MODEL,
         contents=build_user_prompt(relato, tipo, stacks),
         config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT),
     )
-    if not response.text:
-        raise RuntimeError("O Gemini retornou uma resposta vazia. Tente reformular o relato.")
-    return response.text
+    for chunk in stream:
+        if chunk.text:
+            yield chunk.text
 
 
 def render_result(markdown: str, key: str) -> None:
     st.markdown(markdown)
+    render_extras(markdown, key)
+
+
+def render_extras(markdown: str, key: str) -> None:
     bloco = extract_copy_block(markdown)
     if bloco:
         st.caption("📋 Use o ícone de copiar no canto do bloco abaixo para colar no Azure DevOps:")
@@ -130,13 +135,20 @@ relato = st.text_area(
     "porque o front não foi avisado e não havia teste de contrato...",
 )
 
+gerou = False
 if st.button("Gerar DoR / DoD", type="primary"):
     if not relato.strip():
         st.warning("Cole ao menos um relato antes de gerar.")
     else:
         try:
+            st.divider()
             with st.spinner("Analisando o relato com o Gemini..."):
-                resultado = generate(api_key, relato, tipo, stacks)
+                # O spinner cobre só a espera pelo primeiro trecho; depois o texto aparece em streaming.
+                stream = generate_stream(api_key, relato, tipo, stacks)
+                primeiro = next(stream, None)
+            if primeiro is None:
+                raise RuntimeError("O Gemini retornou uma resposta vazia. Tente reformular o relato.")
+            resultado = st.write_stream(itertools.chain([primeiro], stream))
             st.session_state.historico.insert(
                 0,
                 {
@@ -147,10 +159,12 @@ if st.button("Gerar DoR / DoD", type="primary"):
                 },
             )
             st.session_state.atual = resultado
+            render_extras(resultado, "atual")
+            gerou = True
         except Exception as e:
             st.error(f"Falha ao chamar a API do Gemini: {e}")
 
-if st.session_state.get("atual"):
+if st.session_state.get("atual") and not gerou:
     st.divider()
     render_result(st.session_state.atual, "atual")
 
