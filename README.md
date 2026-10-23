@@ -2,6 +2,12 @@
 
 Painel Streamlit que transforma relatos de dores do time, retrospectivas e bugs de produção em critérios acionáveis de **DoR** e **DoD**, com um bloco pronto para colar no Azure DevOps. Sem banco de dados: tudo em tempo real e em memória.
 
+## Links
+- 🌐 **App online:** _(pendente: cole aqui a URL `https://<nome>.streamlit.app` após o deploy)_
+- 🚀 **Fazer o deploy:** [abrir no Streamlit Cloud](https://share.streamlit.io/deploy?repository=dperezandre/dor-dod-generator&branch=main&mainModule=app.py) (já preenchido com este repositório)
+- 🔑 **Gerar chave do Gemini:** https://aistudio.google.com/apikey
+- 💻 **Local:** http://localhost:8501 (após `streamlit run app.py`)
+
 ## Recursos
 - Análise de causa raiz (Refinamento/DoR vs. Execução/DoD)
 - Checklists de DoR e DoD com papéis (`[PO]`, `[Tech Lead]`, `[QA]`...)
